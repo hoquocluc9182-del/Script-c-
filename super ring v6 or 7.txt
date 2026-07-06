@@ -1,0 +1,121 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "🌪️ k00pkidd770 Vertical V2",
+   LoadingTitle = "Đang cấu hình cột thẳng đứng...",
+   LoadingSubtitle = "Thêm thanh kéo Chiều Rộng",
+})
+
+local MainTab = Window:CreateTab("Điều Khiển", 4483362458)
+
+local active = false
+local range = 130
+local columnRadius = 6     -- Chiều rộng mặc định của cột
+local columnHeight = 45     -- Chiều cao cột phóng lên trời
+local speed = 14            -- Tốc độ xoáy cuộn bốc lên
+
+MainTab:CreateToggle({
+   Name = "Kích hoạt Cột Thẳng Đứng",
+   CurrentValue = false,
+   Callback = function(Value)
+      active = Value
+   end,
+})
+
+MainTab:CreateSlider({
+   Name = "Phạm vi hút (Range)",
+   Range = {10, 300},
+   Increment = 10,
+   CurrentValue = 130,
+   Callback = function(Value) range = Value end,
+})
+
+-- THANH KÉO CHIỀU RỘNG ĐÃ ĐƯỢC THÊM LẠI Ở ĐÂY
+MainTab:CreateSlider({
+   Name = "Chiều rộng cột (Radius)",
+   Range = {3, 30},
+   Increment = 1,
+   CurrentValue = 6,
+   Callback = function(Value) columnRadius = Value end,
+})
+
+MainTab:CreateSlider({
+   Name = "Chiều cao cột bắn trời",
+   Range = {20, 80},
+   Increment = 5,
+   CurrentValue = 45,
+   Callback = function(Value) columnHeight = Value end,
+})
+
+local angle = 0
+local blockOffsets = {}
+
+game:GetService("RunService").Heartbeat:Connect(function()
+   if active then
+      local char = game.Players.LocalPlayer.Character
+      local root = char and char:FindFirstChild("HumanoidRootPart")
+      
+      if root then
+         angle = angle + (speed / 100)
+         local parts = {}
+
+         -- Quét và lọc vật thể trong game
+         for _, v in pairs(game.Workspace:GetDescendants()) do
+            if v:IsA("BasePart") and not v.Anchored and not v:IsDescendantOf(char) then
+               if not v.Parent:FindFirstChild("Humanoid") and not v.Parent.Parent:FindFirstChild("Humanoid") then
+                  if (v.Position - root.Position).Magnitude <= range then
+                     table.insert(parts, v)
+                     pcall(function()
+                        sethiddenproperty(game.Players.LocalPlayer, "SimulationRadius", math.huge)
+                        v.CanCollide = false
+                     end)
+                  end
+               end
+            end
+         end
+
+         local totalParts = #parts
+         for i, part in pairs(parts) do
+            -- Tạo độ lệch hỗn loạn tự nhiên cho từng khối
+            if not blockOffsets[part] then
+               blockOffsets[part] = {
+                  radMod = (math.random(-15, 15) / 10), -- Độ lệch ra vào ngẫu nhiên
+                  heightMod = (math.random(-30, 30) / 10), 
+                  speedMod = (math.random(8, 12) / 10) 
+               }
+            end
+            
+            local mods = blockOffsets[part]
+            local progress = (i / totalParts)
+            
+            -- Tính toán chiều cao từ chân lên đỉnh cột
+            local currentHeight = (progress * columnHeight) - 3 + mods.heightMod
+            
+            -- CHIỀU RỘNG MỚI: Kết hợp giữa thanh kéo Radius và độ lệch ngẫu nhiên
+            local currentRadius = columnRadius + mods.radMod
+            
+            -- Tính toán góc xoắn đuổi nhau bay thẳng đứng lên trời
+            local spiralAngle = (angle * mods.speedMod) + (i * (math.pi * 2 / 5)) + (currentHeight * 0.4)
+            
+            local targetPos = root.Position + Vector3.new(
+                math.cos(spiralAngle) * currentRadius,
+                currentHeight,
+                math.sin(spiralAngle) * currentRadius
+            )
+            
+            -- Ép lực đẩy mạnh mẽ di chuyển khối theo quỹ đạo đứng
+            local velocityVector = (targetPos - part.Position) * 35
+            part.Velocity = velocityVector
+         end
+         
+         -- Dọn dẹp bảng lưu trữ khi khối đi xa hoặc mất tích
+         for part, _ in pairs(blockOffsets) do
+            if not part or not part.Parent or (part.Position - root.Position).Magnitude > range then
+               blockOffsets[part] = nil
+            end
+         end
+      end
+   else
+      blockOffsets = {}
+   end
+end)
